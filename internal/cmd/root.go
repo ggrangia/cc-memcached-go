@@ -4,7 +4,9 @@ Copyright © 2024 Giacomo Grangia
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -16,16 +18,41 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "cc-memcached-go",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Coding challenges: build your own memcached in golang.",
+	Long:  ``,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Run: func(cmd *cobra.Command, args []string) {
+		port := viper.GetInt("port")
+		listenSoc := &net.TCPAddr{
+			IP:   net.ParseIP("127.0.0.1"),
+			Port: port,
+		}
+		tcpConn, err := net.ListenTCP("tcp", listenSoc)
+		if err != nil {
+			fmt.Println("Error listening: ", err.Error())
+			os.Exit(1)
+		}
+		fmt.Println("Listening on port", port)
+
+		defer tcpConn.Close()
+
+		for {
+			conn, err := tcpConn.Accept()
+			if err != nil {
+				fmt.Println("Error accepting connections: ", err.Error())
+			}
+
+			buffer, err := bufio.NewReader(conn).ReadBytes('\n')
+			if err != nil {
+				fmt.Println("Error reading: ", err.Error())
+			} else {
+				fmt.Println("Received ", string(buffer))
+			}
+			conn.Close()
+		}
+
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -40,15 +67,13 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cc-memcached-go.yaml)")
-
+	rootCmd.PersistentFlags().IntP("port", "p", 11211, "listening port")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
 }
 
 // initConfig reads in config file and ENV variables if set.
