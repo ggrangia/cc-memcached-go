@@ -6,6 +6,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -41,18 +42,30 @@ var rootCmd = &cobra.Command{
 			conn, err := tcpConn.Accept()
 			if err != nil {
 				fmt.Println("Error accepting connections: ", err.Error())
+				os.Exit(1)
 			}
-
-			buffer, err := bufio.NewReader(conn).ReadBytes('\n')
-			if err != nil {
-				fmt.Println("Error reading: ", err.Error())
-			} else {
-				fmt.Println("Received ", string(buffer))
-			}
-			conn.Close()
+			go handleRequest(conn)
 		}
 
 	},
+}
+
+func handleRequest(conn net.Conn) {
+	reader := bufio.NewReader(conn)
+
+	for {
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			// Check for EOF
+			if err == io.EOF {
+				fmt.Println("Client closed the connection")
+			} else {
+				fmt.Println("Error reading: ", err.Error())
+			}
+			break
+		}
+		fmt.Println(string(message))
+	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
