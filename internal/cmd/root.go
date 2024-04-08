@@ -4,7 +4,7 @@ Copyright © 2024 Giacomo Grangia
 package cmd
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -12,6 +12,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/ggrangia/cc-memcached-go/internal/parser"
 )
 
 var cfgFile string
@@ -51,20 +53,45 @@ var rootCmd = &cobra.Command{
 }
 
 func handleRequest(conn net.Conn) {
-	reader := bufio.NewReader(conn)
+	chunkSize := 4096
 
 	for {
-		message, err := reader.ReadString('\n')
-		if err != nil {
-			// Check for EOF
-			if err == io.EOF {
-				fmt.Println("Client closed the connection")
-			} else {
-				fmt.Println("Error reading: ", err.Error())
+		buffer := bytes.NewBuffer(nil)
+		dataSize := 0
+		// Read data in chucks
+		for {
+			chunk := make([]byte, chunkSize)
+			read, err := conn.Read(chunk)
+			if err != nil {
+				// Check for EOF
+				if err == io.EOF {
+					fmt.Println("Client closed the connection")
+				} else {
+					fmt.Println("Error reading: ", err.Error())
+				}
+				break
 			}
-			break
+			buffer.Write(chunk[:read])
+			dataSize += read
+			if read == 0 || read < chunkSize {
+				break
+			}
 		}
-		fmt.Println(string(message))
+
+		//strCmd := buffer.String()
+		fmt.Println("got: ", buffer.Bytes())
+		cmdParts := parser.Parse(buffer)
+		action := string(cmdParts[0])
+		fmt.Println(action)
+
+		switch action {
+		case "set":
+			parser.ParseSet(cmdParts)
+		case "get":
+			parser.ParseGet(cmdParts)
+		default:
+			return Command{}, fmt.Errorf("invalid action: %s", action)
+		}
 	}
 }
 
