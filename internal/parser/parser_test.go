@@ -16,10 +16,10 @@ func TestParseSet(t *testing.T) {
 		expected parser.Command
 		errMsg   string
 	}{
-		{"ok", "set foo 0 1 4", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false}, ""},
-		{"short", "set ", parser.Command{}, `incorrect number of elements for "set" action: 2`},
-		{"long", "set foo 0 1 3 4 4 4", parser.Command{}, `incorrect number of elements for "set" action: 8`},
-		{"noreply", "set foo 0 0 4 noreply", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 0, ByteCount: 4, Noreply: true}, ""},
+		{"ok", "set foo 0 1 4\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false}, ""},
+		{"short", "set \r\n", parser.Command{}, `incorrect number of elements for "set" action: 2`},
+		{"long", "set foo 0 1 3 4 4 4\r\n", parser.Command{}, `incorrect number of elements for "set" action: 8`},
+		{"noreply", "set foo 0 0 4 noreply\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 0, ByteCount: 4, Noreply: true}, ""},
 	}
 
 	for _, d := range data {
@@ -46,12 +46,12 @@ func TestParseGet(t *testing.T) {
 	data := []struct {
 		name     string
 		strCmd   string
-		expected parser.GetCommand
+		expected parser.Command
 		errMsg   string
 	}{
-		{"ok", "get mykey", parser.GetCommand{Action: "get", Key: "mykey"}, ""},
-		{"short", "get", parser.GetCommand{}, `incorrect number of elements for "get" action: 1`},
-		{"long", "get mykey another one", parser.GetCommand{}, `incorrect number of elements for "get" action: 4`},
+		{"ok", "get mykey\r\n", parser.Command{Action: "get", Key: "mykey"}, ""},
+		{"short", "get\r\n", parser.Command{}, `incorrect number of elements for "get" action: 1`},
+		{"long", "get mykey another one\r\n", parser.Command{}, `incorrect number of elements for "get" action: 4`},
 	}
 
 	for _, d := range data {

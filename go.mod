@@ -3,6 +3,7 @@ module github.com/ggrangia/cc-memcached-go
 go 1.22.1
 
 require (
+	github.com/google/go-cmp v0.5.9
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 )

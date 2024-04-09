@@ -4,16 +4,12 @@ Copyright © 2024 Giacomo Grangia
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"net"
 	"os"
 
+	"github.com/ggrangia/cc-memcached-go/internal/cache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/ggrangia/cc-memcached-go/internal/parser"
 )
 
 var cfgFile string
@@ -23,76 +19,12 @@ var rootCmd = &cobra.Command{
 	Use:   "cc-memcached-go",
 	Short: "Coding challenges: build your own memcached in golang.",
 	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 		port := viper.GetInt("port")
-		listenSoc := &net.TCPAddr{
-			IP:   net.ParseIP("127.0.0.1"),
-			Port: port,
-		}
-		tcpConn, err := net.ListenTCP("tcp", listenSoc)
-		if err != nil {
-			fmt.Println("Error listening: ", err.Error())
-			os.Exit(1)
-		}
-		fmt.Println("Listening on port", port)
+		cache := cache.NewCache(port)
 
-		defer tcpConn.Close()
-
-		for {
-			conn, err := tcpConn.Accept()
-			if err != nil {
-				fmt.Println("Error accepting connections: ", err.Error())
-				os.Exit(1)
-			}
-			go handleRequest(conn)
-		}
-
+		cache.Start()
 	},
-}
-
-func handleRequest(conn net.Conn) {
-	chunkSize := 4096
-
-	for {
-		buffer := bytes.NewBuffer(nil)
-		dataSize := 0
-		// Read data in chucks
-		for {
-			chunk := make([]byte, chunkSize)
-			read, err := conn.Read(chunk)
-			if err != nil {
-				// Check for EOF
-				if err == io.EOF {
-					fmt.Println("Client closed the connection")
-				} else {
-					fmt.Println("Error reading: ", err.Error())
-				}
-				break
-			}
-			buffer.Write(chunk[:read])
-			dataSize += read
-			if read == 0 || read < chunkSize {
-				break
-			}
-		}
-
-		//strCmd := buffer.String()
-		fmt.Println("got: ", buffer.Bytes())
-		cmdParts := parser.Parse(buffer)
-		action := string(cmdParts[0])
-		fmt.Println(action)
-
-		switch action {
-		case "set":
-			parser.ParseSet(cmdParts)
-		case "get":
-			parser.ParseGet(cmdParts)
-		default:
-			return Command{}, fmt.Errorf("invalid action: %s", action)
-		}
-	}
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

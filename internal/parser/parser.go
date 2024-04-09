@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
-func Parse(buffer *bytes.Buffer) [][]byte {
+func Parse(buffer *bytes.Buffer) (Command, error) {
+	var err error = nil
+	var command Command = Command{}
 
 	splitted := bytes.Split(buffer.Bytes(), []byte(" "))
 	// Remove empty arrays (multiple spaces in the command)
@@ -17,25 +20,19 @@ func Parse(buffer *bytes.Buffer) [][]byte {
 		}
 	}
 	fmt.Println(cmdParts)
-	return cmdParts
-}
-
-/*
-	// The first block is the action (set, get)
 	action := string(cmdParts[0])
 	fmt.Println(action)
 
 	switch action {
 	case "set":
-		ParseSet(cmdParts)
+		command, err = ParseSet(cmdParts)
 	case "get":
-		ParseGet(cmdParts)
+		command, err = ParseGet(cmdParts)
 	default:
-		return Command{}, fmt.Errorf("invalid action: %s", action)
+		err = fmt.Errorf("invalid action: %s", action)
 	}
-
-	return Command{}, errors.New("TODO: complete the function")
-*/
+	return command, err
+}
 
 func ParseSet(actionParams [][]byte) (Command, error) {
 
@@ -46,22 +43,22 @@ func ParseSet(actionParams [][]byte) (Command, error) {
 		return Command{}, fmt.Errorf("incorrect number of elements for \"set\" action: %d", actionsLength)
 	}
 
-	key := string(actionParams[1])
-	flags, err := strconv.Atoi(string(actionParams[2]))
+	key := strings.TrimSpace(string(actionParams[1]))
+	flags, err := strconv.Atoi(strings.TrimSpace(string(actionParams[2])))
 	if err != nil {
 		return Command{}, fmt.Errorf("flags conversion error: %s", err.Error())
 	}
-	exptime, err := strconv.Atoi(string(actionParams[3]))
+	exptime, err := strconv.Atoi(strings.TrimSpace(string(actionParams[3])))
 	if err != nil {
 		return Command{}, fmt.Errorf("exptime conversion error: %s", err.Error())
 	}
-	byteCount, err := strconv.Atoi(string(actionParams[4]))
+	byteCount, err := strconv.Atoi(strings.TrimSpace(string(actionParams[4])))
 	if err != nil {
 		return Command{}, fmt.Errorf("bytecount conversion error: %s", err.Error())
 	}
 
 	noreply := false
-	if actionsLength == 6 && string(actionParams[5]) == "noreply" {
+	if actionsLength == 6 && strings.TrimSpace(string(actionParams[5])) == "noreply" {
 		noreply = true
 	}
 
@@ -77,16 +74,16 @@ func ParseSet(actionParams [][]byte) (Command, error) {
 	}, nil
 }
 
-func ParseGet(actionParams [][]byte) (GetCommand, error) {
+func ParseGet(actionParams [][]byte) (Command, error) {
 	// <command name> <key>\r\n
 	actionsLength := len(actionParams)
 	if actionsLength != 2 {
-		return GetCommand{}, fmt.Errorf(`incorrect number of elements for "get" action: %d`, actionsLength)
+		return Command{}, fmt.Errorf(`incorrect number of elements for "get" action: %d`, actionsLength)
 	}
 
-	key := string(actionParams[1])
+	key := strings.TrimSpace(string(actionParams[1]))
 
 	fmt.Println(key)
 
-	return GetCommand{Action: "get", Key: key}, nil
+	return Command{Action: "get", Key: key}, nil
 }
