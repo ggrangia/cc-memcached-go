@@ -16,31 +16,32 @@ type Cache struct {
 }
 
 type Data struct {
-	Value   []byte
-	Flags   int
-	expTime int
+	Value     []byte
+	Flags     int
+	ExpTime   int
+	ByteCount int
 }
 
-func (c Cache) Start() {
+func (c *Cache) Start() {
 	listenSoc := &net.TCPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: c.port,
 	}
-	tcpConn, err := net.ListenTCP("tcp", listenSoc)
+	tcpListener, err := net.ListenTCP("tcp", listenSoc)
 	if err != nil {
 		fmt.Println("Error listening: ", err.Error())
 		os.Exit(1)
 	}
 	fmt.Println("Listening on port", c.port)
-	defer tcpConn.Close()
+	defer tcpListener.Close()
 
 	for {
-		conn, err := tcpConn.Accept()
+		conn, err := tcpListener.Accept()
 		if err != nil {
 			fmt.Println("Error accepting connections: ", err.Error())
 			os.Exit(1)
 		}
-		go handleRequest(conn)
+		go c.handleRequest(conn)
 	}
 }
 
@@ -51,7 +52,7 @@ func NewCache(port int) *Cache {
 	}
 }
 
-func handleRequest(conn net.Conn) {
+func (c Cache) handleRequest(conn net.Conn) {
 	chunkSize := 4096
 
 	// listen for multiple messages loop
@@ -85,6 +86,26 @@ func handleRequest(conn net.Conn) {
 			fmt.Println(err.Error())
 			continue // keep listening
 		}
-		fmt.Println("%v", cmd)
+		//fmt.Println("%v", cmd)
+		c.ProcessCommand(cmd, conn)
+	}
+}
+
+func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) {
+	var message []byte
+
+	if cmd.Action == "get" {
+		d, exist := c.Store[cmd.Key]
+		if exist {
+			fmt.Println(string(d.Value))
+			s := fmt.Sprintf("VALUE %s %d %d\r\n", d.Value, d.Flags, d.ByteCount)
+			message = []byte(s)
+		} else {
+			message = []byte("END\r\n")
+		}
+		_, err := conn.Write(message)
+		if err != nil {
+			fmt.Println("Error writing: ", err.Error())
+		}
 	}
 }

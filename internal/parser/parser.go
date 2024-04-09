@@ -20,7 +20,7 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 		}
 	}
 	fmt.Println(cmdParts)
-	action := string(cmdParts[0])
+	action := strings.TrimSpace(string(cmdParts[0]))
 	fmt.Println(action)
 
 	switch action {
