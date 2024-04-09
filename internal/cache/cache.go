@@ -81,6 +81,9 @@ func (c Cache) handleRequest(conn net.Conn) {
 
 		//strCmd := buffer.String()
 		fmt.Println("got: ", buffer.Bytes())
+		// TODO: what if process command is invoked only after the "complete" command is obtained?
+		// get command is complete after 1 line
+		// set cmd parse first line and keep listening for incoming data
 		cmd, err := parser.Parse(buffer)
 		if err != nil {
 			fmt.Println(err.Error())
