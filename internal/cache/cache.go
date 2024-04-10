@@ -54,7 +54,9 @@ func NewCache(port int) *Cache {
 
 func (c Cache) handleRequest(conn net.Conn) {
 	chunkSize := 4096
-
+	var activeCmd parser.Command
+	var waitForData bool
+	var err error
 	// listen for multiple messages loop
 	for {
 		buffer := bytes.NewBuffer(nil)
@@ -79,22 +81,39 @@ func (c Cache) handleRequest(conn net.Conn) {
 			}
 		}
 
-		//strCmd := buffer.String()
 		fmt.Println("got: ", buffer.Bytes())
-		// TODO: what if process command is invoked only after the "complete" command is obtained?
 		// get command is complete after 1 line
 		// set cmd parse first line and keep listening for incoming data
-		cmd, err := parser.Parse(buffer)
-		if err != nil {
-			fmt.Println(err.Error())
-			continue // keep listening
+		// TODO: handle multiple messages as long as they are < bytecount
+		if waitForData {
+			// parse data
+			// remove \r\n
+			buffData := buffer.Bytes()[:buffer.Len()-2]
+			fmt.Println(buffData, string(buffData), activeCmd.ByteCount)
+			if len(buffData) > activeCmd.ByteCount {
+				conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
+			} else {
+				activeCmd.Data = buffData
+				waitForData = false
+				activeCmd = c.ProcessCommand(activeCmd, conn)
+			}
+		} else {
+			activeCmd, err = parser.Parse(buffer)
+			if err != nil {
+				fmt.Println(err.Error())
+				conn.Write([]byte("ERROR\r\n"))
+			} else if activeCmd.Complete {
+				waitForData = false
+				activeCmd = c.ProcessCommand(activeCmd, conn)
+				//fmt.Println("%v", cmd)
+			} else {
+				waitForData = true
+			}
 		}
-		//fmt.Println("%v", cmd)
-		c.ProcessCommand(cmd, conn)
 	}
 }
 
-func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) {
+func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command {
 	var message []byte
 
 	if cmd.Action == "get" {
@@ -110,5 +129,19 @@ func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) {
 		if err != nil {
 			fmt.Println("Error writing: ", err.Error())
 		}
+	} else if cmd.Action == "set" {
+		c.Store[cmd.Key] = Data{
+			Value:     cmd.Data,
+			ExpTime:   cmd.Exptime,
+			Flags:     cmd.Flags,
+			ByteCount: len(cmd.Data),
+		}
+		if !cmd.Noreply {
+			_, err := conn.Write([]byte("END\r\n"))
+			if err != nil {
+				fmt.Println("Error writing: ", err.Error())
+			}
+		}
 	}
+	return parser.Command{}
 }

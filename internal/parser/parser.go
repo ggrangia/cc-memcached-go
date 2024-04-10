@@ -85,5 +85,5 @@ func ParseGet(actionParams [][]byte) (Command, error) {
 
 	fmt.Println(key)
 
-	return Command{Action: "get", Key: key}, nil
+	return Command{Action: "get", Key: key, Complete: true}, nil
 }
