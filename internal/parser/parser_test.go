@@ -16,7 +16,7 @@ func TestParser(t *testing.T) {
 		expected parser.Command
 		errMsg   string
 	}{
-		{"empty str", "", parser.Command{}, ""},
+		{"empty str", "", parser.Command{}, "Empty command"},
 	}
 	for _, d := range data {
 		t.Run(d.name, func(t *testing.T) {
@@ -44,10 +44,12 @@ func TestParseSet(t *testing.T) {
 		expected parser.Command
 		errMsg   string
 	}{
-		{"ok", "set foo 0 1 4\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false}, ""},
+		{"ok", "set foo 0 1 4\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false, Complete: false}, ""},
 		{"short", "set \r\n", parser.Command{}, `incorrect number of elements for "set" action: 2`},
 		{"long", "set foo 0 1 3 4 4 4\r\n", parser.Command{}, `incorrect number of elements for "set" action: 8`},
 		{"noreply", "set foo 0 0 4 noreply\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 0, ByteCount: 4, Noreply: true}, ""},
+		{"bytecount_as_int", "set foo 0 0 ooops\r\n", parser.Command{}, `bytecount conversion error: strconv.Atoi: parsing "ooops": invalid syntax`},
+		{"all_str", "set foo ops all strings\r\n", parser.Command{}, `flags conversion error: strconv.Atoi: parsing "ops": invalid syntax`},
 	}
 
 	for _, d := range data {
@@ -77,7 +79,7 @@ func TestParseGet(t *testing.T) {
 		expected parser.Command
 		errMsg   string
 	}{
-		{"ok", "get mykey\r\n", parser.Command{Action: "get", Key: "mykey"}, ""},
+		{"ok", "get mykey\r\n", parser.Command{Action: "get", Key: "mykey", Complete: true}, ""},
 		{"short", "get\r\n", parser.Command{}, `incorrect number of elements for "get" action: 1`},
 		{"long", "get mykey another one\r\n", parser.Command{}, `incorrect number of elements for "get" action: 4`},
 	}
