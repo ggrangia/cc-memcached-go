@@ -17,8 +17,3 @@ type Command struct {
 	Noreply   bool
 	Complete  bool
 }
-
-type GetCommand struct {
-	Action Action
-	Key    string
-}
