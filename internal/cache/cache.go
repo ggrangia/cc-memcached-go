@@ -151,7 +151,7 @@ func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	d, exist := c.Store[cmd.Key]
 	if exist {
 		fmt.Println(string(d.Value))
-		s := fmt.Sprintf("VALUE %s %d %d\r\n", d.Value, d.Flags, d.ByteCount)
+		s := fmt.Sprintf("VALUE %s %d %d\n%s\n", cmd.Key, d.Flags, d.ByteCount, d.Value)
 		message = []byte(s)
 	} else {
 		message = []byte("END\r\n")
