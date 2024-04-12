@@ -9,6 +9,34 @@ import (
 	"github.com/ggrangia/cc-memcached-go/internal/parser"
 )
 
+func TestParser(t *testing.T) {
+	data := []struct {
+		name     string
+		strCmd   string
+		expected parser.Command
+		errMsg   string
+	}{
+		{"empty str", "", parser.Command{}, ""},
+	}
+	for _, d := range data {
+		t.Run(d.name, func(t *testing.T) {
+			var errMsg string
+
+			buff := bytes.NewBuffer([]byte(d.strCmd))
+			got, err := parser.Parse(buff)
+			if diff := cmp.Diff(d.expected, got); diff != "" {
+				t.Errorf(diff)
+			}
+			if err != nil {
+				errMsg = err.Error()
+			}
+			if d.errMsg != errMsg {
+				t.Errorf("Expected error message `%s` got `%s`", d.errMsg, errMsg)
+			}
+		})
+	}
+}
+
 func TestParseSet(t *testing.T) {
 	data := []struct {
 		name     string

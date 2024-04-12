@@ -22,6 +22,13 @@ type Data struct {
 	ByteCount int
 }
 
+func NewCache(port int) *Cache {
+	return &Cache{
+		port:  port,
+		Store: make(map[string]Data, 50),
+	}
+}
+
 func (c *Cache) Start() {
 	listenSoc := &net.TCPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
@@ -45,10 +52,25 @@ func (c *Cache) Start() {
 	}
 }
 
-func NewCache(port int) *Cache {
-	return &Cache{
-		port:  port,
-		Store: make(map[string]Data, 50),
+func (c *Cache) ReadChunks(conn net.Conn, buffer *bytes.Buffer, chunkSize int, dataSize int) (int, error) {
+	for {
+		chunk := make([]byte, chunkSize)
+		read, err := conn.Read(chunk)
+		if err != nil {
+			var errMsg string
+			// Check for EOF
+			if err == io.EOF {
+				errMsg = "Client closed the connection"
+			} else {
+				errMsg = fmt.Sprintf("Error reading: %s", err.Error())
+			}
+			return -1, fmt.Errorf("%s", errMsg)
+		}
+		buffer.Write(chunk[:read])
+		dataSize += read
+		if read == 0 || read < chunkSize {
+			return dataSize, nil
+		}
 	}
 }
 
@@ -57,28 +79,17 @@ func (c Cache) handleRequest(conn net.Conn) {
 	var activeCmd parser.Command
 	var waitForData bool
 	var err error
+
+	defer conn.Close()
 	// listen for multiple messages loop
 	for {
 		buffer := bytes.NewBuffer(nil)
 		dataSize := 0
 		// Read data in chucks
-		for {
-			chunk := make([]byte, chunkSize)
-			read, err := conn.Read(chunk)
-			if err != nil {
-				// Check for EOF
-				if err == io.EOF {
-					fmt.Println("Client closed the connection")
-				} else {
-					fmt.Println("Error reading: ", err.Error())
-				}
-				break
-			}
-			buffer.Write(chunk[:read])
-			dataSize += read
-			if read == 0 || read < chunkSize {
-				break
-			}
+		_, readErr := c.ReadChunks(conn, buffer, chunkSize, dataSize)
+		if readErr != nil {
+			fmt.Println(readErr.Error())
+			break
 		}
 
 		fmt.Println("got: ", buffer.Bytes())

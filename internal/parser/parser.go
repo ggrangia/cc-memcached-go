@@ -19,6 +19,10 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 			cmdParts = append(cmdParts, v)
 		}
 	}
+	if len(cmdParts) == 0 {
+		return Command{}, fmt.Errorf("Empty command")
+	}
+
 	fmt.Println(cmdParts)
 	action := strings.TrimSpace(string(cmdParts[0]))
 	fmt.Println(action)
