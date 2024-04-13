@@ -28,7 +28,7 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 	fmt.Println(action)
 
 	switch action {
-	case "set", "add":
+	case "set", "add", "replace":
 		command, err = ParseCommandAction(action, cmdParts)
 	case "get":
 		command, err = ParseGet(cmdParts)
