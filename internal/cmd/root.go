@@ -4,11 +4,10 @@ Copyright © 2024 Giacomo Grangia
 package cmd
 
 import (
-	"bufio"
 	"fmt"
-	"net"
 	"os"
 
+	"github.com/ggrangia/cc-memcached-go/internal/cache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -20,38 +19,11 @@ var rootCmd = &cobra.Command{
 	Use:   "cc-memcached-go",
 	Short: "Coding challenges: build your own memcached in golang.",
 	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
 		port := viper.GetInt("port")
-		listenSoc := &net.TCPAddr{
-			IP:   net.ParseIP("127.0.0.1"),
-			Port: port,
-		}
-		tcpConn, err := net.ListenTCP("tcp", listenSoc)
-		if err != nil {
-			fmt.Println("Error listening: ", err.Error())
-			os.Exit(1)
-		}
-		fmt.Println("Listening on port", port)
+		cache := cache.NewCache(port)
 
-		defer tcpConn.Close()
-
-		for {
-			conn, err := tcpConn.Accept()
-			if err != nil {
-				fmt.Println("Error accepting connections: ", err.Error())
-			}
-
-			buffer, err := bufio.NewReader(conn).ReadBytes('\n')
-			if err != nil {
-				fmt.Println("Error reading: ", err.Error())
-			} else {
-				fmt.Println("Received ", string(buffer))
-			}
-			conn.Close()
-		}
-
+		cache.Start()
 	},
 }
 
