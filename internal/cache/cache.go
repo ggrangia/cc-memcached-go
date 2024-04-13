@@ -13,13 +13,7 @@ import (
 
 type Cache struct {
 	port  int
-	Store map[string]Data
-}
-
-type Store interface {
-	Get() (Data, error)
-	Set() (Data, error)
-	Delete(error)
+	Store Store
 }
 
 type Data struct {
@@ -171,11 +165,15 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
 		return
 	}
-	if _, exists := c.Store[cmd.Key]; exists {
+	if _, exists, getErr := c.Store.Get(cmd.Key); exists {
+		if getErr != nil {
+			fmt.Println("ProcessAdd: ", getErr.Error())
+		}
 		conn.Write([]byte("NOT_STORED\r\n"))
 		return
 	}
-	c.Store[cmd.Key] = Data{
+	// FIXME: refactor in a single function
+	data := Data{
 		Value:     cmd.Data,
 		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
 		Flags:     cmd.Flags,
@@ -203,12 +201,18 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 		exptime = int(time.Now().Unix()) + cmd.Exptime
 	}
 
-	c.Store[cmd.Key] = Data{
+	data := Data{
 		Value:     cmd.Data,
 		ExpTime:   exptime,
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
+	err := c.Store.Save(data)
+	if err != nil {
+		fmt.Println("Error saving: ", err.Error())
+		conn.Write([]byte("ERROR\r\n"))
+	}
+
 	if !cmd.Noreply {
 		_, err := conn.Write([]byte("END\r\n"))
 		if err != nil {
@@ -219,11 +223,21 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 
 func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	message := bytes.NewBuffer([]byte{})
-	d, exist := c.Store[cmd.Key]
+	d, exist, getErr := c.Store.Get(cmd.Key)
+
+	if getErr != nil {
+		fmt.Println("Error reading data :", getErr.Error())
+		return
+	}
+
 	if exist && d.IsExpired() {
-		delete(c.Store, cmd.Key)
+		delErr := c.Store.Delete(cmd.Key)
+		if delErr != nil {
+			fmt.Println("Error deleting key %s: ", cmd.Key, delErr.Error())
+		}
 		exist = false
 	}
+
 	if exist {
 		fmt.Println(string(d.Value))
 		s := fmt.Sprintf("VALUE %s %d %d\n%s\n", cmd.Key, d.Flags, d.ByteCount, d.Value)
