@@ -24,7 +24,7 @@ type Data struct {
 }
 
 func (d Data) IsExpired() bool {
-	return d.ExpTime < int(time.Now().Unix())
+	return d.ExpTime > 0 && d.ExpTime < int(time.Now().Unix())
 }
 
 func NewCache(port int) *Cache {
@@ -133,13 +133,22 @@ func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command 
 }
 
 func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
+	var exptime int
+
 	if len(cmd.Data) > cmd.ByteCount {
 		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
 		return
 	}
+
+	if cmd.Exptime == 0 {
+		exptime = 0
+	} else {
+		exptime = int(time.Now().Unix()) + cmd.Exptime
+	}
+
 	c.Store[cmd.Key] = Data{
 		Value:     cmd.Data,
-		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
+		ExpTime:   exptime,
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
