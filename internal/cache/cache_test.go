@@ -10,6 +10,13 @@ import (
 	"github.com/ggrangia/cc-memcached-go/internal/parser"
 )
 
+type StoreMock struct {
+}
+
+func (s *StoreMock) Delete(key string) error {
+
+}
+
 type FullNetConnMock struct {
 	read func(b []byte) (n int, err error)
 	// write            func(b []byte) (n int, err error)
@@ -59,7 +66,8 @@ func (f FullNetConnMock) SetWriteDeadline(t time.Time) error {
 }
 
 func TestProcessCommands(t *testing.T) {
-	c := cache.NewCache(4000)
+	s := StoreMock{}
+	c := cache.NewCache(400, s)
 	myData := cache.Data{
 		Value:     []byte("100"),
 		Flags:     12,

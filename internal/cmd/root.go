@@ -21,7 +21,8 @@ var rootCmd = &cobra.Command{
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
 		port := viper.GetInt("port")
-		cache := cache.NewCache(port)
+		simpleStore := cache.NewSimpleStore(500)
+		cache := cache.NewCache(port, simpleStore)
 
 		cache.Start()
 	},

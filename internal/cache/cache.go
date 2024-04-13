@@ -27,10 +27,10 @@ func (d Data) IsExpired() bool {
 	return d.ExpTime > 0 && d.ExpTime < int(time.Now().Unix())
 }
 
-func NewCache(port int) *Cache {
+func NewCache(port int, store Store) *Cache {
 	return &Cache{
 		port:  port,
-		Store: make(map[string]Data, 50),
+		Store: store,
 	}
 }
 
@@ -142,15 +142,27 @@ func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
 		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
 		return
 	}
-	if _, exists := c.Store[cmd.Key]; !exists {
+	_, exists, getErr := c.Store.Get(cmd.Key)
+
+	if getErr != nil {
+		fmt.Println("ProcessAdd: ", getErr.Error())
+	}
+
+	if !exists {
 		conn.Write([]byte("NOT_STORED\r\n"))
 		return
 	}
-	c.Store[cmd.Key] = Data{
+
+	data := Data{
 		Value:     cmd.Data,
 		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
+	}
+	err := c.Store.Save(cmd.Key, data)
+	if err != nil {
+		fmt.Println("Error saving: ", err.Error())
+		conn.Write([]byte("ERROR\r\n"))
 	}
 	if !cmd.Noreply {
 		_, err := conn.Write([]byte("STORED\r\n"))
@@ -165,10 +177,11 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
 		return
 	}
-	if _, exists, getErr := c.Store.Get(cmd.Key); exists {
-		if getErr != nil {
-			fmt.Println("ProcessAdd: ", getErr.Error())
-		}
+	_, exists, getErr := c.Store.Get(cmd.Key)
+	if getErr != nil {
+		fmt.Println("ProcessAdd: ", getErr.Error())
+	}
+	if exists {
 		conn.Write([]byte("NOT_STORED\r\n"))
 		return
 	}
@@ -178,6 +191,11 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
+	}
+	err := c.Store.Save(cmd.Key, data)
+	if err != nil {
+		fmt.Println("Error saving: ", err.Error())
+		conn.Write([]byte("ERROR\r\n"))
 	}
 	if !cmd.Noreply {
 		_, err := conn.Write([]byte("STORED\r\n"))
@@ -207,7 +225,7 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
-	err := c.Store.Save(data)
+	err := c.Store.Save(cmd.Key, data)
 	if err != nil {
 		fmt.Println("Error saving: ", err.Error())
 		conn.Write([]byte("ERROR\r\n"))
