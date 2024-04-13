@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"time"
 
 	"github.com/ggrangia/cc-memcached-go/internal/parser"
 )
@@ -20,6 +21,10 @@ type Data struct {
 	Flags     int
 	ExpTime   int
 	ByteCount int
+}
+
+func (d Data) IsExpired() bool {
+	return d.ExpTime < int(time.Now().Unix())
 }
 
 func NewCache(port int) *Cache {
@@ -134,7 +139,7 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 	}
 	c.Store[cmd.Key] = Data{
 		Value:     cmd.Data,
-		ExpTime:   cmd.Exptime,
+		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
@@ -149,6 +154,10 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	var message []byte
 	d, exist := c.Store[cmd.Key]
+	if exist && d.IsExpired() {
+		delete(c.Store, cmd.Key)
+		exist = false
+	}
 	if exist {
 		fmt.Println(string(d.Value))
 		s := fmt.Sprintf("VALUE %s %d %d\n%s\n", cmd.Key, d.Flags, d.ByteCount, d.Value)
