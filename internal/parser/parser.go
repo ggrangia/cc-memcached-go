@@ -28,8 +28,8 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 	fmt.Println(action)
 
 	switch action {
-	case "set":
-		command, err = ParseSet(cmdParts)
+	case "set", "add":
+		command, err = ParseCommandAction(action, cmdParts)
 	case "get":
 		command, err = ParseGet(cmdParts)
 	default:
@@ -38,13 +38,14 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 	return command, err
 }
 
-func ParseSet(actionParams [][]byte) (Command, error) {
+func ParseCommandAction(action string, actionParams [][]byte) (Command, error) {
 
 	actionsLength := len(actionParams)
 	fmt.Println(actionsLength)
 	// <command name> <key> <flags> <exptime> <byte count> [noreply]\r\n
+	// <data block>\r\n
 	if actionsLength > 6 || actionsLength < 5 {
-		return Command{}, fmt.Errorf("incorrect number of elements for \"set\" action: %d", actionsLength)
+		return Command{}, fmt.Errorf("incorrect number of elements for \"%s\" action: %d", action, actionsLength)
 	}
 
 	key := strings.TrimSpace(string(actionParams[1]))
@@ -69,7 +70,7 @@ func ParseSet(actionParams [][]byte) (Command, error) {
 	fmt.Println(key, flags, exptime, byteCount, noreply)
 
 	return Command{
-		Action:    "set",
+		Action:    action,
 		Key:       key,
 		Flags:     flags,
 		Exptime:   exptime,

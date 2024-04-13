@@ -41,15 +41,20 @@ func TestParseSet(t *testing.T) {
 	data := []struct {
 		name     string
 		strCmd   string
+		action   string
 		expected parser.Command
 		errMsg   string
 	}{
-		{"ok", "set foo 0 1 4\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false, Complete: false}, ""},
-		{"short", "set \r\n", parser.Command{}, `incorrect number of elements for "set" action: 2`},
-		{"long", "set foo 0 1 3 4 4 4\r\n", parser.Command{}, `incorrect number of elements for "set" action: 8`},
-		{"noreply", "set foo 0 0 4 noreply\r\n", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 0, ByteCount: 4, Noreply: true}, ""},
-		{"bytecount_as_int", "set foo 0 0 ooops\r\n", parser.Command{}, `bytecount conversion error: strconv.Atoi: parsing "ooops": invalid syntax`},
-		{"all_str", "set foo ops all strings\r\n", parser.Command{}, `flags conversion error: strconv.Atoi: parsing "ops": invalid syntax`},
+		// set
+		{"ok", "set foo 0 1 4\r\n", "set", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false, Complete: false}, ""},
+		{"short", "set \r\n", "set", parser.Command{}, `incorrect number of elements for "set" action: 2`},
+		{"long", "set foo 0 1 3 4 4 4\r\n", "set", parser.Command{}, `incorrect number of elements for "set" action: 8`},
+		{"noreply", "set foo 0 0 4 noreply\r\n", "set", parser.Command{Action: "set", Key: "foo", Flags: 0, Exptime: 0, ByteCount: 4, Noreply: true}, ""},
+		{"bytecount_as_int", "set foo 0 0 ooops\r\n", "set", parser.Command{}, `bytecount conversion error: strconv.Atoi: parsing "ooops": invalid syntax`},
+		{"all_str", "set foo ops all strings\r\n", "set", parser.Command{}, `flags conversion error: strconv.Atoi: parsing "ops": invalid syntax`},
+		// add
+		{"ok", "add foo 0 1 4\r\n", "add", parser.Command{Action: "add", Key: "foo", Flags: 0, Exptime: 1, ByteCount: 4, Noreply: false, Complete: false}, ""},
+		{"short", "add \r\n", "add", parser.Command{}, `incorrect number of elements for "add" action: 2`},
 	}
 
 	for _, d := range data {
@@ -58,7 +63,7 @@ func TestParseSet(t *testing.T) {
 
 			buffer := bytes.NewBufferString(d.strCmd)
 			buffList := bytes.Split(buffer.Bytes(), []byte(" "))
-			val, err := parser.ParseSet(buffList)
+			val, err := parser.ParseCommandAction(d.action, buffList)
 			if diff := cmp.Diff(d.expected, val); diff != "" {
 				t.Errorf(diff)
 			}
