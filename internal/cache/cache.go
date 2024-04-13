@@ -218,7 +218,7 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 }
 
 func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
-	var message []byte
+	message := bytes.NewBuffer([]byte{})
 	d, exist := c.Store[cmd.Key]
 	if exist && d.IsExpired() {
 		delete(c.Store, cmd.Key)
@@ -227,11 +227,11 @@ func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	if exist {
 		fmt.Println(string(d.Value))
 		s := fmt.Sprintf("VALUE %s %d %d\n%s\n", cmd.Key, d.Flags, d.ByteCount, d.Value)
-		message = []byte(s)
-	} else {
-		message = []byte("END\r\n")
+		message.Write([]byte(s))
 	}
-	_, err := conn.Write(message)
+	message.Write([]byte("END\r\n"))
+
+	_, err := conn.Write(message.Bytes())
 	if err != nil {
 		fmt.Println("Error writing: ", err.Error())
 	}
