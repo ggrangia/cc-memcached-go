@@ -1,14 +1,7 @@
 package parser
 
-type Action string
-
-const (
-	ActionSet = "set"
-	ActionGet = "get"
-)
-
 type Command struct {
-	Action    Action
+	Action    string
 	Data      []byte
 	Key       string
 	Exptime   int
