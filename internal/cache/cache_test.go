@@ -14,7 +14,15 @@ type StoreMock struct {
 }
 
 func (s *StoreMock) Delete(key string) error {
+	return nil
+}
 
+func (s *StoreMock) Save(key string, data cache.Data) error {
+	return nil
+}
+
+func (s *StoreMock) Get(key string) (cache.Data, bool, error) {
+	return cache.Data{}, false, nil
 }
 
 type FullNetConnMock struct {
@@ -66,7 +74,7 @@ func (f FullNetConnMock) SetWriteDeadline(t time.Time) error {
 }
 
 func TestProcessCommands(t *testing.T) {
-	s := StoreMock{}
+	s := &StoreMock{}
 	c := cache.NewCache(400, s)
 	myData := cache.Data{
 		Value:     []byte("100"),
@@ -74,11 +82,11 @@ func TestProcessCommands(t *testing.T) {
 		ExpTime:   0,
 		ByteCount: 3,
 	}
-	c.Store["foo"] = myData
+	c.Store.Save("foo", myData)
 	cmd := parser.Command{
 		Action: "get",
 		Key:    "foo",
 	}
-	mock := FullNetConnMock{}
-	c.ProcessCommand(cmd, mock)
+	connMock := FullNetConnMock{}
+	c.ProcessCommand(cmd, connMock)
 }
