@@ -23,12 +23,10 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 		return Command{}, fmt.Errorf("Empty command")
 	}
 
-	fmt.Println(cmdParts)
 	action := strings.TrimSpace(string(cmdParts[0]))
-	fmt.Println(action)
 
 	switch action {
-	case "set", "add", "replace":
+	case "set", "add", "replace", "append", "prepend":
 		command, err = ParseCommandAction(action, cmdParts)
 	case "get":
 		command, err = ParseGet(cmdParts)
@@ -41,7 +39,6 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 func ParseCommandAction(action string, actionParams [][]byte) (Command, error) {
 
 	actionsLength := len(actionParams)
-	fmt.Println(actionsLength)
 	// <command name> <key> <flags> <exptime> <byte count> [noreply]\r\n
 	// <data block>\r\n
 	if actionsLength > 6 || actionsLength < 5 {
@@ -67,8 +64,6 @@ func ParseCommandAction(action string, actionParams [][]byte) (Command, error) {
 		noreply = true
 	}
 
-	fmt.Println(key, flags, exptime, byteCount, noreply)
-
 	return Command{
 		Action:    action,
 		Key:       key,
@@ -87,8 +82,6 @@ func ParseGet(actionParams [][]byte) (Command, error) {
 	}
 
 	key := strings.TrimSpace(string(actionParams[1]))
-
-	fmt.Println(key)
 
 	return Command{Action: "get", Key: key, Complete: true}, nil
 }
