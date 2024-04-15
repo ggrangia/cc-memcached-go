@@ -139,6 +139,12 @@ func (c Cache) handleNewCommand(buffer *bytes.Buffer, activeCmd parser.Command, 
 	return activeCmd, waitForData
 }
 
+func (c *Cache) sendMessage(conn net.Conn, message string) {
+	if _, err := conn.Write([]byte(message)); err != nil {
+		fmt.Println("Error writing to connection:", err)
+	}
+}
+
 func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command {
 	switch cmd.Action {
 	case "get":
@@ -155,7 +161,7 @@ func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command 
 
 func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
 	if len(cmd.Data) > cmd.ByteCount {
-		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
+		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
 	}
 	_, exists, getErr := c.Store.Get(cmd.Key)
@@ -165,7 +171,7 @@ func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
 	}
 
 	if !exists {
-		conn.Write([]byte("NOT_STORED\r\n"))
+		c.sendMessage(conn, "NOT_STORED\r\n")
 		return
 	}
 
@@ -181,16 +187,13 @@ func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
 		conn.Write([]byte("ERROR\r\n"))
 	}
 	if !cmd.Noreply {
-		_, err := conn.Write([]byte("STORED\r\n"))
-		if err != nil {
-			fmt.Println("Error writing: ", err.Error())
-		}
+		c.sendMessage(conn, "STORED\r\n")
 	}
 }
 
 func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 	if len(cmd.Data) > cmd.ByteCount {
-		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
+		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
 	}
 	_, exists, getErr := c.Store.Get(cmd.Key)
@@ -198,7 +201,7 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		fmt.Println("ProcessAdd: ", getErr.Error())
 	}
 	if exists {
-		conn.Write([]byte("NOT_STORED\r\n"))
+		c.sendMessage(conn, "NOT_STORED\r\n")
 		return
 	}
 
@@ -210,14 +213,10 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 	}
 	err := c.Store.Save(cmd.Key, data)
 	if err != nil {
-		fmt.Println("Error saving: ", err.Error())
-		conn.Write([]byte("ERROR\r\n"))
+		c.sendMessage(conn, "ERROR\r\n")
 	}
 	if !cmd.Noreply {
-		_, err := conn.Write([]byte("STORED\r\n"))
-		if err != nil {
-			fmt.Println("Error writing: ", err.Error())
-		}
+		c.sendMessage(conn, "STORED\r\n")
 	}
 }
 
@@ -225,7 +224,7 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 	var exptime int
 
 	if len(cmd.Data) > cmd.ByteCount {
-		conn.Write([]byte("CLIENT_ERROR bad data chunk\r\n"))
+		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
 	}
 
@@ -244,14 +243,11 @@ func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
 	err := c.Store.Save(cmd.Key, data)
 	if err != nil {
 		fmt.Println("Error saving: ", err.Error())
-		conn.Write([]byte("ERROR\r\n"))
+		c.sendMessage(conn, "ERROR\r\n")
 	}
 
 	if !cmd.Noreply {
-		_, err := conn.Write([]byte("END\r\n"))
-		if err != nil {
-			fmt.Println("Error writing: ", err.Error())
-		}
+		c.sendMessage(conn, "END\r\n")
 	}
 }
 
@@ -267,7 +263,7 @@ func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	if exist && d.IsExpired() {
 		delErr := c.Store.Delete(cmd.Key)
 		if delErr != nil {
-			fmt.Println("Error deleting key %s: ", cmd.Key, delErr.Error())
+			fmt.Printf("Error deleting key %s: %s\n", cmd.Key, delErr.Error())
 		}
 		exist = false
 	}
