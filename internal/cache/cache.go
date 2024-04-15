@@ -97,7 +97,6 @@ func (c Cache) handleRequest(conn net.Conn) {
 			break
 		}
 
-		fmt.Println("got: ", buffer.Bytes())
 		if waitForData {
 			activeCmd, waitForData = c.handleMoreData(buffer, activeCmd, waitForData, conn)
 		} else {

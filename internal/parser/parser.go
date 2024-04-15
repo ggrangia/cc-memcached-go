@@ -23,9 +23,7 @@ func Parse(buffer *bytes.Buffer) (Command, error) {
 		return Command{}, fmt.Errorf("Empty command")
 	}
 
-	fmt.Println(cmdParts)
 	action := strings.TrimSpace(string(cmdParts[0]))
-	fmt.Println(action)
 
 	switch action {
 	case "set", "add", "replace", "append", "prepend":
