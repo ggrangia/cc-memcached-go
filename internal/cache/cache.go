@@ -202,8 +202,6 @@ func (c *Cache) ProcessExtendData(conn net.Conn, cmd parser.Command, appendData 
 }
 
 func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
-	var exptime int
-
 	if len(cmd.Data) > cmd.ByteCount {
 		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
@@ -219,31 +217,25 @@ func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
 		return
 	}
 
-	if cmd.Exptime == 0 {
-		exptime = 0
-	} else {
-		exptime = int(time.Now().Unix()) + cmd.Exptime
-	}
-
 	data := Data{
 		Value:     cmd.Data,
-		ExpTime:   exptime,
+		ExpTime:   calculateExpiryTime(cmd.Exptime),
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
-	err := c.Store.Save(cmd.Key, data)
-	if err != nil {
-		fmt.Println("Error saving: ", err.Error())
-		conn.Write([]byte("ERROR\r\n"))
+
+	if err := c.Store.Save(cmd.Key, data); err != nil {
+		fmt.Println("Error saving data:", err)
+		c.sendMessage(conn, "ERROR\r\n")
+		return
 	}
+
 	if !cmd.Noreply {
 		c.sendMessage(conn, "STORED\r\n")
 	}
 }
 
 func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
-	var exptime int
-
 	if len(cmd.Data) > cmd.ByteCount {
 		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
@@ -259,56 +251,41 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		return
 	}
 
-	if cmd.Exptime == 0 {
-		exptime = 0
-	} else {
-		exptime = int(time.Now().Unix()) + cmd.Exptime
-	}
-
 	data := Data{
 		Value:     cmd.Data,
-		ExpTime:   exptime,
+		ExpTime:   calculateExpiryTime(cmd.Exptime),
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
 
-	err := c.Store.Save(cmd.Key, data)
-
-	if err != nil {
-		fmt.Println("Save error: ", err.Error())
+	if err := c.Store.Save(cmd.Key, data); err != nil {
+		fmt.Println("Error saving data:", err)
 		c.sendMessage(conn, "ERROR\r\n")
+		return
 	}
+
 	if !cmd.Noreply {
 		c.sendMessage(conn, "STORED\r\n")
 	}
 }
 
 func (c *Cache) ProcessSet(conn net.Conn, cmd parser.Command) {
-	var exptime int
-
 	if len(cmd.Data) > cmd.ByteCount {
 		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
 		return
 	}
 
-	if cmd.Exptime == 0 {
-		exptime = 0
-	} else {
-		exptime = int(time.Now().Unix()) + cmd.Exptime
-	}
-
 	data := Data{
 		Value:     cmd.Data,
-		ExpTime:   exptime,
+		ExpTime:   calculateExpiryTime(cmd.Exptime),
 		Flags:     cmd.Flags,
 		ByteCount: len(cmd.Data),
 	}
 
-	err := c.Store.Save(cmd.Key, data)
-
-	if err != nil {
-		fmt.Println("Error saving: ", err.Error())
+	if err := c.Store.Save(cmd.Key, data); err != nil {
+		fmt.Println("Error saving data:", err)
 		c.sendMessage(conn, "ERROR\r\n")
+		return
 	}
 
 	if !cmd.Noreply {
