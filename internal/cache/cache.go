@@ -108,7 +108,6 @@ func (c Cache) handleRequest(conn net.Conn) {
 func (c Cache) handleMoreData(buffer *bytes.Buffer, activeCmd parser.Command, waitForData bool, conn net.Conn) (parser.Command, bool) {
 	// remove \r\n
 	buffData := buffer.Bytes()[:buffer.Len()-2]
-	fmt.Println(buffData, string(buffData), activeCmd.ByteCount)
 	activeCmd.Data = append(activeCmd.Data, buffData...)
 	if len(activeCmd.Data) >= activeCmd.ByteCount {
 		waitForData = false
