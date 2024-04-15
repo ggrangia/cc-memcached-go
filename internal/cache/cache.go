@@ -155,8 +155,36 @@ func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command 
 		c.ProcessAdd(conn, cmd)
 	case "replace":
 		c.ProcessReplace(conn, cmd)
+	case "append":
+		c.ProcessAppend(conn, cmd)
 	}
 	return parser.Command{}
+}
+
+func (c *Cache) ProcessAppend(conn net.Conn, cmd parser.Command) {
+	data, exists, getErr := c.Store.Get(cmd.Key)
+
+	if getErr != nil {
+		fmt.Println("ProcessAppend: ", getErr.Error())
+	}
+
+	if !exists {
+		c.sendMessage(conn, "NOT_STORED\r\n")
+		return
+	}
+
+	data.ByteCount += len(cmd.Data)
+	data.Value = append(data.Value, cmd.Data...)
+	err := c.Store.Save(cmd.Key, data)
+
+	if err != nil {
+		fmt.Println("Error saving: ", err.Error())
+		conn.Write([]byte("ERROR\r\n"))
+	}
+
+	if !cmd.Noreply {
+		c.sendMessage(conn, "STORED\r\n")
+	}
 }
 
 func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
