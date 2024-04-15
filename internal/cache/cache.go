@@ -80,10 +80,10 @@ func (c *Cache) ReadChunks(conn net.Conn, buffer *bytes.Buffer, chunkSize int, d
 }
 
 func (c Cache) handleRequest(conn net.Conn) {
-	chunkSize := 4096
+	const chunkSize = 4096
 	var activeCmd parser.Command
-	var waitForData bool
-	var err error
+
+	waitForData := false
 
 	defer conn.Close()
 	// listen for multiple messages loop
@@ -99,28 +99,44 @@ func (c Cache) handleRequest(conn net.Conn) {
 
 		fmt.Println("got: ", buffer.Bytes())
 		if waitForData {
-			// parse data
-			// remove \r\n
-			buffData := buffer.Bytes()[:buffer.Len()-2]
-			fmt.Println(buffData, string(buffData), activeCmd.ByteCount)
-			activeCmd.Data = append(activeCmd.Data, buffData...)
-			if len(activeCmd.Data) >= activeCmd.ByteCount {
-				waitForData = false
-				activeCmd = c.ProcessCommand(activeCmd, conn)
-			}
+			activeCmd, waitForData = c.handleMoreData(buffer, activeCmd, waitForData, conn)
 		} else {
-			activeCmd, err = parser.Parse(buffer)
-			if err != nil {
-				fmt.Println(err.Error())
-				conn.Write([]byte("ERROR\r\n"))
-			} else if activeCmd.Complete {
-				waitForData = false
-				activeCmd = c.ProcessCommand(activeCmd, conn)
-			} else {
-				waitForData = true
-			}
+			activeCmd, waitForData = c.handleNewCommand(buffer, activeCmd, waitForData, conn)
 		}
 	}
+}
+
+func (c Cache) handleMoreData(buffer *bytes.Buffer, activeCmd parser.Command, waitForData bool, conn net.Conn) (parser.Command, bool) {
+	// remove \r\n
+	buffData := buffer.Bytes()[:buffer.Len()-2]
+	fmt.Println(buffData, string(buffData), activeCmd.ByteCount)
+	activeCmd.Data = append(activeCmd.Data, buffData...)
+	if len(activeCmd.Data) >= activeCmd.ByteCount {
+		waitForData = false
+		activeCmd = c.ProcessCommand(activeCmd, conn)
+	}
+	return activeCmd, waitForData
+}
+
+func (c Cache) handleNewCommand(buffer *bytes.Buffer, activeCmd parser.Command, waitForData bool, conn net.Conn) (parser.Command, bool) {
+	var err error
+
+	activeCmd, err = parser.Parse(buffer)
+
+	if err != nil {
+		fmt.Println("Parse error:", err)
+		conn.Write([]byte("ERROR\r\n"))
+		// "reset" cmd and waitForData
+		return parser.Command{}, false
+	}
+
+	if activeCmd.Complete {
+		waitForData = false
+		activeCmd = c.ProcessCommand(activeCmd, conn)
+	} else {
+		waitForData = true
+	}
+	return activeCmd, waitForData
 }
 
 func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command {
@@ -185,7 +201,7 @@ func (c *Cache) ProcessAdd(conn net.Conn, cmd parser.Command) {
 		conn.Write([]byte("NOT_STORED\r\n"))
 		return
 	}
-	// FIXME: refactor in a single function
+
 	data := Data{
 		Value:     cmd.Data,
 		ExpTime:   int(time.Now().Unix()) + cmd.Exptime,
