@@ -155,20 +155,25 @@ func (c Cache) ProcessCommand(cmd parser.Command, conn net.Conn) parser.Command 
 	case "replace":
 		c.ProcessReplace(conn, cmd)
 	case "append":
-		c.ProcessAppend(conn, cmd)
+		c.ProcessExtendData(conn, cmd, true)
 	case "prepend":
-		c.ProcessPrepend(conn, cmd)
+		c.ProcessExtendData(conn, cmd, false)
 	}
 	return parser.Command{}
 }
 
-func (c *Cache) ProcessPrepend(conn net.Conn, cmd parser.Command) {
-	var exptime int
+func (c *Cache) ProcessExtendData(conn net.Conn, cmd parser.Command, appendData bool) {
+	if len(cmd.Data) > cmd.ByteCount {
+		c.sendMessage(conn, "CLIENT_ERROR bad data chunk\r\n")
+		return
+	}
 
-	data, exists, getErr := c.Store.Get(cmd.Key)
+	data, exists, err := c.Store.Get(cmd.Key)
 
-	if getErr != nil {
-		fmt.Println("ProcessAppend: ", getErr.Error())
+	if err != nil {
+		fmt.Println("Error accessing data store:", err)
+		c.sendMessage(conn, "ERROR\r\n")
+		return
 	}
 
 	if !exists {
@@ -176,62 +181,24 @@ func (c *Cache) ProcessPrepend(conn net.Conn, cmd parser.Command) {
 		return
 	}
 
-	if cmd.Exptime == 0 {
-		exptime = 0
+	if appendData {
+		data.Value = append(data.Value, cmd.Data...)
 	} else {
-		exptime = int(time.Now().Unix()) + cmd.Exptime
+		data.Value = append(cmd.Data, data.Value...)
 	}
-
 	data.ByteCount += len(cmd.Data)
-	data.Value = append(cmd.Data, data.Value...)
-	data.ExpTime = exptime
+	data.ExpTime = calculateExpiryTime(cmd.Exptime)
 
-	err := c.Store.Save(cmd.Key, data)
-
-	if err != nil {
-		fmt.Println("Error saving: ", err.Error())
-		conn.Write([]byte("ERROR\r\n"))
-	}
-
-	if !cmd.Noreply {
-		c.sendMessage(conn, "STORED\r\n")
-	}
-}
-
-func (c *Cache) ProcessAppend(conn net.Conn, cmd parser.Command) {
-	var exptime int
-
-	data, exists, getErr := c.Store.Get(cmd.Key)
-
-	if getErr != nil {
-		fmt.Println("ProcessAppend: ", getErr.Error())
-	}
-
-	if !exists {
-		c.sendMessage(conn, "NOT_STORED\r\n")
+	if err := c.Store.Save(cmd.Key, data); err != nil {
+		fmt.Println("Error saving data:", err)
+		c.sendMessage(conn, "ERROR\r\n")
 		return
 	}
 
-	if cmd.Exptime == 0 {
-		exptime = 0
-	} else {
-		exptime = int(time.Now().Unix()) + cmd.Exptime
-	}
-
-	data.ByteCount += len(cmd.Data)
-	data.Value = append(data.Value, cmd.Data...)
-	data.ExpTime = exptime
-
-	err := c.Store.Save(cmd.Key, data)
-
-	if err != nil {
-		fmt.Println("Error saving: ", err.Error())
-		conn.Write([]byte("ERROR\r\n"))
-	}
-
 	if !cmd.Noreply {
 		c.sendMessage(conn, "STORED\r\n")
 	}
+
 }
 
 func (c *Cache) ProcessReplace(conn net.Conn, cmd parser.Command) {
@@ -377,4 +344,11 @@ func (c *Cache) ProcessGet(conn net.Conn, cmd parser.Command) {
 	if err != nil {
 		fmt.Println("Error writing: ", err.Error())
 	}
+}
+
+func calculateExpiryTime(exptime int) int {
+	if exptime == 0 {
+		return 0
+	}
+	return int(time.Now().Unix()) + exptime
 }
